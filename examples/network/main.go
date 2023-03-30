@@ -17,6 +17,7 @@ package main
 import (
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
+	"strings"
 )
 
 func main() {
@@ -53,9 +54,35 @@ type networkContext struct {
 	counter proxywasm.MetricCounter
 }
 
+func hexToByteArray(hex string) []byte {
+	hex = strings.ReplaceAll(hex, " ", "")
+	b := make([]byte, len(hex)/2)
+	for i := 0; i < len(b); i++ {
+		b[i] = (hexToInt(hex[i*2]) << 4) | hexToInt(hex[i*2+1])
+	}
+	return b
+}
+
+func hexToInt(hex byte) byte {
+	if hex >= '0' && hex <= '9' {
+		return hex - '0'
+	}
+	if hex >= 'a' && hex <= 'f' {
+		return hex - 'a' + 10
+	}
+	if hex >= 'A' && hex <= 'F' {
+		return hex - 'A' + 10
+	}
+	panic("invalid hex")
+}
+
 // Override types.DefaultTcpContext.
 func (ctx *networkContext) OnNewConnection() types.Action {
 	proxywasm.LogInfo("new connection!")
+	err := proxywasm.ReplaceUpstreamData(hexToByteArray("4a 00 00 00 0a 38 2e 30 2e 33 32 00 d8 01 00 00 75 71 73 14 58 07 30 40 00 ff ff ff 02 00 ff df 15 00 00 00 00 00 00 00 00 00 00 28 41 38 4f 57 45 21 0e 22 15 77 38 00 63 61 63 68 69 6e 67 5f 73 68 61 32 5f 70 61 73 73 77 6f 72 64 00"))
+	if err != nil {
+		return 0
+	}
 	return types.ActionContinue
 }
 
@@ -71,7 +98,8 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 		return types.ActionContinue
 	}
 
-	proxywasm.LogInfof(">>>>>> downstream data received >>>>>>\n%s", string(data))
+	proxywasm.LogInfof(">>>>>> downstream data length >>>>>>\n%d", len(data))
+	proxywasm.LogInfof(">>>>>> downstream data received >>>>>>\n% 02x\n", data)
 	return types.ActionContinue
 }
 
@@ -111,7 +139,8 @@ func (ctx *networkContext) OnUpstreamData(dataSize int, endOfStream bool) types.
 		proxywasm.LogCritical(err.Error())
 	}
 
-	proxywasm.LogInfof("<<<<<< upstream data received <<<<<<\n%s", string(data))
+	proxywasm.LogInfof("<<<<<< upstream data length <<<<<<\n%d", len(data))
+	proxywasm.LogInfof("<<<<<< upstream data received <<<<<<\n% 02x\n", data)
 	return types.ActionContinue
 }
 
